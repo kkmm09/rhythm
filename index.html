@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>海賊お宝キャッチ！〜ゴールド＆ダイアモンド〜</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol:wght@700&family=M+PLUS+Rounded+1c:wght@800;900&display=swap');
+        
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            background-color: #090d16;
+        }
+
+        .font-pirate {
+            font-family: 'Kaisei Decol', serif;
+        }
+
+        .glow-gold {
+            text-shadow: 0 0 12px rgba(251, 191, 36, 0.8), 0 0 24px rgba(245, 158, 11, 0.5);
+        }
+
+        .glow-danger {
+            text-shadow: 0 0 12px rgba(244, 63, 94, 0.8), 0 0 24px rgba(225, 29, 72, 0.5);
+        }
+
+        .pulse-btn {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        ::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen flex flex-col justify-center items-center p-2 sm:p-4 overflow-hidden">
+
+    <!-- ゲーム本体コンテナ -->
+    <div id="game-container" class="relative w-full max-w-4xl bg-amber-950 rounded-3xl shadow-2xl border-4 border-amber-600 overflow-hidden flex flex-col items-center justify-between min-h-[600px] sm:min-h-[680px]">
+        
+        <!-- ヘッダーUI (スコア・コンボ・残り時間) -->
+        <div class="absolute top-0 left-0 right-0 p-3 sm:p-5 z-20 flex justify-between items-center pointer-events-none">
+            <!-- 得点 & ハイスコア -->
+            <div class="bg-slate-950/85 border-2 border-amber-500/70 rounded-2xl px-3 py-1.5 sm:px-4 sm:py-2 backdrop-blur-md flex items-center gap-2 sm:gap-3">
+                <span class="text-xl sm:text-3xl">💰</span>
+                <div>
+                    <div class="text-[10px] sm:text-xs text-amber-300 font-bold">獲得金額</div>
+                    <div id="score-text" class="text-base sm:text-2xl font-black text-amber-100 glow-gold">G 000,000</div>
+                </div>
+            </div>
+
+            <!-- 残り時間 -->
+            <div class="bg-slate-950/85 border-2 border-amber-500/70 rounded-2xl px-4 py-1.5 sm:px-5 sm:py-2 backdrop-blur-md flex items-center gap-2 text-center">
+                <div>
+                    <div class="text-[10px] sm:text-xs text-amber-300 font-bold">出航まで</div>
+                    <div id="timer-text" class="text-lg sm:text-3xl font-black text-rose-400">60s</div>
+                </div>
+            </div>
+
+            <!-- 連鎖コンボ -->
+            <div class="bg-slate-950/85 border-2 border-amber-500/70 rounded-2xl px-3 py-1.5 sm:px-4 sm:py-2 backdrop-blur-md flex items-center gap-2 sm:gap-3">
+                <div>
+                    <div class="text-[10px] sm:text-xs text-amber-300 font-bold text-right">ノリノリ連続</div>
+                    <div id="combo-text" class="text-base sm:text-2xl font-black text-amber-400 text-right">0 CATCH</div>
+                </div>
+                <span class="text-xl sm:text-3xl">✨</span>
+            </div>
+        </div>
+
+        <!-- Canvas表示領域（奥からお宝が飛んでくる） -->
+        <div class="relative w-full h-full flex-1 flex items-center justify-center">
+            <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+
+            <!-- 判定メッセージポップアップ -->
+            <div id="judgement-text" class="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-4xl sm:text-6xl font-black opacity-0 transition-all duration-150 pointer-events-none drop-shadow-[0_5px_8px_rgba(0,0,0,0.9)]">
+                PERFECT!
+            </div>
+        </div>
+
+        <!-- 操作用巨大ボタン -->
+        <div id="controls-bar" class="w-full p-3 sm:p-4 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent z-20 flex flex-col justify-center items-center pb-4 sm:pb-6">
+            <button id="catch-btn" class="w-full max-w-lg bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 active:scale-95 text-slate-950 font-black text-2xl sm:text-4xl py-4 sm:py-6 rounded-2xl shadow-[0_8px_0_#b45309] border-2 border-yellow-200 transition-all cursor-pointer flex items-center justify-center gap-3 active:translate-y-1 active:shadow-none">
+                <span>💎</span> 宝箱でキャッチ！ [ SPACE ]
+            </button>
+            <div class="text-amber-200/80 text-xs sm:text-sm mt-2 font-bold">
+                ⚠️ 骸骨（ドクロ）が飛んできたときはボタンを押さずにスルー！
+            </div>
+        </div>
+
+        <!-- スタート＆タイトル画面 -->
+        <div id="start-overlay" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md z-30 flex flex-col items-center justify-center p-6 text-center">
+            <div class="text-amber-400 text-xl sm:text-2xl font-pirate mb-1 tracking-widest">★ 文化祭スペシャル ★</div>
+            <h1 class="text-3xl sm:text-6xl font-black text-amber-300 mb-2 font-pirate glow-gold leading-tight">
+                海賊お宝キャッチ！
+            </h1>
+            <p class="text-amber-100 text-sm sm:text-base font-bold mb-4">〜 黄金の洞窟から財宝をガッポリ奪え！ 〜</p>
+
+            <div class="bg-amber-950/60 border-2 border-amber-600/80 rounded-2xl p-4 sm:p-5 max-w-md w-full mb-6 text-left text-xs sm:text-sm space-y-2.5">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl sm:text-3xl">🪙</span>
+                    <div>
+                        <span class="font-bold text-amber-300">金貨・宝石：</span>
+                        <span>手前のキャッチゾーンに来たらタイミングよくボタン！</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl sm:text-3xl">💀</span>
+                    <div>
+                        <span class="font-bold text-rose-400">呪いの骸骨：</span>
+                        <span class="text-rose-200 font-bold">絶対押すな！</span> スルーすれば安全回避！
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 border-t border-amber-800/60 pt-2">
+                    <span class="text-2xl">🏆</span>
+                    <div class="text-amber-200 font-bold">
+                        本日のハイスコア: <span id="start-highscore" class="text-amber-400 text-base sm:text-lg">G 0</span>
+                    </div>
+                </div>
+            </div>
+
+            <button id="start-btn" class="pulse-btn bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 font-black text-2xl sm:text-3xl px-10 py-5 rounded-3xl shadow-[0_8px_0_#92400e] border-2 border-yellow-200 transition-all cursor-pointer">
+                出航＆財宝キャッチ！
+            </button>
+        </div>
+
+        <!-- リザルト画面 -->
+        <div id="result-overlay" class="absolute inset-0 bg-slate-950/95 backdrop-blur-md z-30 flex flex-col items-center justify-center p-6 text-center hidden">
+            <div id="result-rank-title" class="text-amber-400 text-xl font-bold mb-1 font-pirate">海賊団での評価</div>
+            <h2 id="result-rank" class="text-4xl sm:text-6xl font-black text-amber-300 mb-3 glow-gold">海賊王級！</h2>
+            <p id="result-comment" class="text-slate-200 text-sm sm:text-base mb-6 max-w-md leading-relaxed">
+                伝説レベルの強欲さだ！山のような宝石と金貨を一切逃さず持ち帰ったぞ！
+            </p>
+
+            <div class="bg-slate-900 border-2 border-amber-500/60 rounded-2xl p-4 w-full max-w-xs mb-6 shadow-xl">
+                <div class="flex justify-between items-center mb-2 pb-2 border-b border-slate-800">
+                    <span class="text-slate-400 text-xs sm:text-sm">今回獲得したお宝</span>
+                    <span id="final-score" class="font-black text-lg sm:text-xl text-amber-300">G 0</span>
+                </div>
+                <div class="flex justify-between text-xs sm:text-sm mb-1.5">
+                    <span class="text-slate-400">PERFECT キャッチ</span>
+                    <span id="final-perfect" class="font-bold text-emerald-400">0</span>
+                </div>
+                <div class="flex justify-between text-xs sm:text-sm mb-1.5">
+                    <span class="text-slate-400">最大連続キャッチ</span>
+                    <span id="final-maxcombo" class="font-bold text-amber-400">0</span>
+                </div>
+                <div class="flex justify-between text-xs sm:text-sm">
+                    <span class="text-slate-400">骸骨爆発ミス</span>
+                    <span id="final-skulls" class="font-bold text-rose-400">0</span>
+                </div>
+            </div>
+
+            <button id="restart-btn" class="bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-slate-950 font-black text-2xl px-10 py-4 rounded-2xl shadow-[0_6px_0_#78350f] border border-yellow-200 transition-all cursor-pointer">
+                次のチャレンジャーへ！
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Canvas & Element Bindings
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        const startOverlay = document.getElementById('start-overlay');
+        const resultOverlay = document.getElementById('result-overlay');
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const catchBtn = document.getElementById('catch-btn');
+        const judgementText = document.getElementById('judgement-text');
+        const scoreText = document.getElementById('score-text');
+        const comboText = document.getElementById('combo-text');
+        const timerText = document.getElementById('timer-text');
+        const startHighscore = document.getElementById('start-highscore');
+
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // -------------------------------------------------------------
+        // WEB AUDIO SYNTHESIZER (効果音 & リズム生成)
+        // -------------------------------------------------------------
+        class PirateAudioSynth {
+            constructor() {
+                this.ctx = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            // 金貨キャッチ音 (Chime / Coin Metallic Sound)
+            playCoinSound() {
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                
+                const osc1 = this.ctx.createOscillator();
+                const osc2 = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc1.type = 'sine';
+                osc2.type = 'triangle';
+                
+                osc1.frequency.setValueAtTime(987.77, now); // B5
+                osc1.frequency.exponentialRampToValueAtTime(1318.51, now + 0.08); // E6
+
+                osc2.frequency.setValueAtTime(1975.53, now); // B6
+                osc2.frequency.exponentialRampToValueAtTime(2637.02, now + 0.08); // E7
+
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+                osc1.connect(gain);
+                osc2.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc1.start(now);
+                osc2.start(now);
+                osc1.stop(now + 0.15);
+                osc2.stop(now + 0.15);
+            }
+
+            // 宝石キャッチ音 (High Pitched Gem Sparkle)
+            playGemSound() {
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+
+                const notes = [1046.50, 1318.51, 1567.98, 2093.00]; // C6, E6, G6, C7
+                notes.forEach((freq, index) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    const start = now + index * 0.04;
+
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, start);
+
+                    gain.gain.setValueAtTime(0.25, start);
+                    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.12);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start(start);
+                    osc.stop(start + 0.12);
+                });
+            }
+
+            // 骸骨タップ爆発音 (Bomb / Curse sound)
+            playSkullExplosion() {
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+
+                // 爆風ノイズ風ローピッチ
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, now);
+                osc.frequency.exponentialRampToValueAtTime(30, now + 0.35);
+
+                gain.gain.setValueAtTime(0.6, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.35);
+            }
+
+            // 空振り音 (Swish)
+            playMissSound() {
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(120, now + 0.1);
+
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.1);
+            }
+
+            // ドラムビート (拍手・ドラム)
+            playBeat(isAccent = false) {
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(isAccent ? 140 : 90, now);
+                osc.frequency.exponentialRampToValueAtTime(30, now + 0.08);
+
+                gain.gain.setValueAtTime(isAccent ? 0.2 : 0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.08);
+            }
+        }
+
+        const audio = new PirateAudioSynth();
+
+        // -------------------------------------------------------------
+        // GAME LOGIC & ENGINE VARIABLES
+        // -------------------------------------------------------------
+        const BPM = 124; // 軽快なテンポ
+        const BEAT_INTERVAL = 60 / BPM;
+        const GAME_DURATION = 60; // 1プレイ60秒（文化祭用に回転率よく！）
+
+        let gameState = 'START';
+        let score = 0;
+        let combo = 0;
+        let maxCombo = 0;
+        let perfectCount = 0;
+        let skullHitCount = 0;
+        let gameStartTime = 0;
+        let currentBeat = -1;
+        let timeRemaining = GAME_DURATION;
+        let highScore = parseInt(localStorage.getItem('pirate_catch_highscore') || '0');
+
+        startHighscore.innerText = `G ${highScore.toLocaleString()}`;
+
+        // ノーツの種類: 'COIN' (金貨), 'GEM' (宝石), 'SKULL' (骸骨/押しちゃダメ)
+        let activeNotes = [];
+        let particles = [];
+        let chestOpenAnim = 0;
+
+        // ノーツ生成パターンシーケンス (リズム天国風 4拍構成)
+        const notePatterns = [
+            // パターン1: 金貨基本
+            { beats: [0, 2], type: 'COIN' },
+            { beats: [0, 1, 2], type: 'COIN' },
+            // パターン2: 骸骨トラップ混ざり！
+            { beats: [0, 2], type: 'COIN' },
+            { beats: [1], type: 'SKULL' },
+            // パターン3: 宝石チャンス！
+            { beats: [0], type: 'GEM' },
+            { beats: [2], type: 'COIN' },
+            // パターン4: 連続トラップ！
+            { beats: [0, 2], type: 'SKULL' },
+            { beats: [1, 3], type: 'COIN' },
+            // パターン5: ラッシュ！
+            { beats: [0, 1, 2, 3], type: 'COIN' },
+            { beats: [0, 2], type: 'GEM' },
+            { beats: [1], type: 'SKULL' }
+        ];
+
+        // -------------------------------------------------------------
+        // INPUT & JUDGEMENT
+        // -------------------------------------------------------------
+        function handlePlayerInput() {
+            if (gameState !== 'PLAYING') return;
+
+            audio.init();
+            const currentTime = audio.ctx.currentTime;
+            chestOpenAnim = Date.now(); // 宝箱ぱかっとアニメーション
+
+            // キャッチ判定ゾーンに一番近いノーツを探す
+            let closest = null;
+            let minDiff = Infinity;
+
+            for (let note of activeNotes) {
+                if (!note.hit && !note.missed) {
+                    const diff = Math.abs(currentTime - note.targetTime);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        closest = note;
+                    }
+                }
+            }
+
+            const PERFECT_WINDOW = 0.09; // ±90ms
+            const GOOD_WINDOW = 0.18;    // ±180ms
+
+            if (closest && minDiff <= GOOD_WINDOW) {
+                closest.hit = true;
+
+                if (closest.type === 'SKULL') {
+                    // ★ 骸骨を叩いてしまった場合 (大ミス！)
+                    audio.playSkullExplosion();
+                    combo = 0;
+                    score = Math.max(0, score - 500);
+                    skullHitCount++;
+                    showJudgement('呪いの爆破！ -500G', 'text-rose-500 glow-danger');
+                    spawnParticles(closest.x, closest.y, '#f43f5e', 25);
+                } else if (closest.type === 'GEM') {
+                    // ★ 宝石キャッチ！ (高得点)
+                    audio.playGemSound();
+                    combo++;
+                    const addScore = minDiff <= PERFECT_WINDOW ? 800 : 400;
+                    score += addScore;
+                    if (minDiff <= PERFECT_WINDOW) perfectCount++;
+                    showJudgement(`宝石GET! +${addScore}G`, 'text-cyan-300 glow-gold');
+                    spawnParticles(closest.x, closest.y, '#38bdf8', 20);
+                } else {
+                    // ★ 金貨キャッチ！
+                    audio.playCoinSound();
+                    combo++;
+                    const addScore = minDiff <= PERFECT_WINDOW ? 300 : 150;
+                    score += addScore;
+                    if (minDiff <= PERFECT_WINDOW) perfectCount++;
+                    showJudgement(`金貨GET! +${addScore}G`, 'text-amber-300 glow-gold');
+                    spawnParticles(closest.x, closest.y, '#fbbf24', 15);
+                }
+            } else {
+                // 何もないところで押した（空振り）
+                audio.playMissSound();
+                showJudgement('空振り...', 'text-slate-400');
+            }
+
+            if (combo > maxCombo) maxCombo = combo;
+            updateUI();
+        }
+
+        function showJudgement(text, colorClass) {
+            judgementText.innerText = text;
+            judgementText.className = `absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-3xl sm:text-5xl font-black transition-all duration-150 pointer-events-none drop-shadow-[0_5px_8px_rgba(0,0,0,0.9)] scale-125 opacity-100 ${colorClass}`;
+            
+            setTimeout(() => {
+                judgementText.classList.remove('scale-125');
+                judgementText.classList.add('scale-100');
+            }, 50);
+
+            setTimeout(() => {
+                judgementText.classList.add('opacity-0');
+            }, 450);
+        }
+
+        function updateUI() {
+            scoreText.innerText = `G ${score.toLocaleString()}`;
+            comboText.innerText = `${combo} CATCH`;
+            timerText.innerText = `${Math.max(0, Math.ceil(timeRemaining))}s`;
+        }
+
+        // -------------------------------------------------------------
+        // PARTICLES & FLYING OBJECTS
+        // -------------------------------------------------------------
+        function spawnNote(type, targetTime) {
+            // 奥（画面下中央〜洞窟奥）から 手前（巨大宝箱）に向かって飛ばす
+            const flightDuration = BEAT_INTERVAL * 2.5; // 2.5拍かけて飛んでくる
+
+            activeNotes.push({
+                type: type, // 'COIN', 'GEM', 'SKULL'
+                targetTime: targetTime,
+                startTime: targetTime - flightDuration,
+                duration: flightDuration,
+                hit: false,
+                missed: false,
+                x: 0,
+                y: 0,
+                scale: 0.1
+            });
+        }
+
+        function spawnParticles(x, y, color, count = 15) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 9 + 3;
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed - 2,
+                    radius: Math.random() * 6 + 3,
+                    color: color,
+                    alpha: 1.0
+                });
+            }
+        }
+
+        // -------------------------------------------------------------
+        // CANVAS DRAWING (宝物庫・背景・お宝・手前宝箱)
+        // -------------------------------------------------------------
+        function drawBackground(time) {
+            // 黄金の海賊洞窟背景
+            const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            grad.addColorStop(0, '#020617');
+            grad.addColorStop(0.5, '#1e1b4b');
+            grad.addColorStop(1, '#451a03');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 奥の宝の山（金色の輝き）
+            const caveX = canvas.width * 0.5;
+            const caveY = canvas.height * 0.35;
+
+            // 洞窟奥の怪しい光
+            const glowGrad = ctx.createRadialGradient(caveX, caveY, 10, caveX, caveY, 200);
+            glowGrad.addColorStop(0, 'rgba(251, 191, 36, 0.4)');
+            glowGrad.addColorStop(0.6, 'rgba(217, 119, 6, 0.15)');
+            glowGrad.addColorStop(1, 'transparent');
+            ctx.fillStyle = glowGrad;
+            ctx.beginPath();
+            ctx.arc(caveX, caveY, 200, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 松明の炎の揺らめき（左右）
+            drawTorch(canvas.width * 0.15, canvas.height * 0.3, time);
+            drawTorch(canvas.width * 0.85, canvas.height * 0.3, time);
+
+            // 手前の宝の山のシルエット
+            ctx.fillStyle = '#78350f';
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height);
+            ctx.lineTo(canvas.width * 0.25, canvas.height * 0.75);
+            ctx.lineTo(canvas.width * 0.5, canvas.height * 0.85);
+            ctx.lineTo(canvas.width * 0.75, canvas.height * 0.75);
+            ctx.lineTo(canvas.width, canvas.height);
+            ctx.fill();
+        }
+
+        function drawTorch(x, y, time) {
+            ctx.fillStyle = '#451a03';
+            ctx.fillRect(x - 6, y, 12, 40);
+
+            // 炎のアニメーション
+            const flameSize = 14 + Math.sin(time * 0.01 + x) * 3;
+            ctx.fillStyle = '#f97316';
+            ctx.beginPath();
+            ctx.arc(x, y - 5, flameSize, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#fef08a';
+            ctx.beginPath();
+            ctx.arc(x, y - 5, flameSize * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawTargetZone() {
+            // キャッチターゲット（手前中央の光る魔法陣＆宝箱）
+            const targetX = canvas.width * 0.5;
+            const targetY = canvas.height * 0.72;
+
+            // リング
+            ctx.strokeStyle = 'rgba(251, 191, 36, 0.5)';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.ellipse(targetX, targetY, 70, 30, 0, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 宝箱描画
+            const isChestOpen = Date.now() - chestOpenAnim < 160;
+            const chestW = 100;
+            const chestH = 60;
+
+            // 宝箱の本体
+            ctx.fillStyle = '#78350f';
+            ctx.fillRect(targetX - chestW/2, targetY - 10, chestW, chestH);
+
+            // 金色の枠線
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(targetX - chestW/2, targetY - 10, chestW, chestH);
+
+            // 宝箱のフタ（開閉）
+            ctx.fillStyle = '#92400e';
+            ctx.beginPath();
+            if (isChestOpen) {
+                // 開いた状態
+                ctx.moveTo(targetX - chestW/2 - 5, targetY - 35);
+                ctx.lineTo(targetX + chestW/2 + 5, targetY - 35);
+                ctx.lineTo(targetX + chestW/2, targetY - 10);
+                ctx.lineTo(targetX - chestW/2, targetY - 10);
+            } else {
+                // 閉じた状態
+                ctx.moveTo(targetX - chestW/2 - 2, targetY - 20);
+                ctx.lineTo(targetX + chestW/2 + 2, targetY - 20);
+                ctx.lineTo(targetX + chestW/2, targetY - 10);
+                ctx.lineTo(targetX - chestW/2, targetY - 10);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        function drawNotes() {
+            const currentTime = audio.ctx ? audio.ctx.currentTime : 0;
+
+            const startX = canvas.width * 0.5;
+            const startY = canvas.height * 0.35; // 洞窟奥
+            const targetX = canvas.width * 0.5;
+            const targetY = canvas.height * 0.72; // 手前宝箱
+
+            for (let i = activeNotes.length - 1; i >= 0; i--) {
+                const note = activeNotes[i];
+                const elapsed = currentTime - note.startTime;
+                const progress = elapsed / note.duration;
+
+                if (progress >= 0 && progress <= 1.25) {
+                    // 放物線 & 遠近感スケール計算
+                    const curX = startX + (targetX - startX) * progress;
+                    // 上にふんわり上がる弧を描く
+                    const arcY = Math.sin(Math.min(1.0, progress) * Math.PI) * 120;
+                    const curY = startY + (targetY - startY) * progress - arcY;
+
+                    // 手前に来るほど大きくなる
+                    const scale = 0.2 + progress * 1.1;
+                    note.x = curX;
+                    note.y = curY;
+
+                    if (!note.hit) {
+                        ctx.save();
+                        ctx.translate(curX, curY);
+                        ctx.scale(scale, scale);
+
+                        if (note.type === 'COIN') {
+                            // 金貨 (GOLD COIN)
+                            ctx.fillStyle = '#fbbf24';
+                            ctx.strokeStyle = '#d97706';
+                            ctx.lineWidth = 3;
+                            ctx.beginPath();
+                            ctx.arc(0, 0, 22, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.stroke();
+
+                            ctx.fillStyle = '#fef08a';
+                            ctx.font = 'bold 18px sans-serif';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillText('$', 0, 0);
+
+                        } else if (note.type === 'GEM') {
+                            // 宝石 (BLUE DIAMOND)
+                            ctx.fillStyle = '#38bdf8';
+                            ctx.strokeStyle = '#0284c7';
+                            ctx.lineWidth = 3;
+                            ctx.beginPath();
+                            ctx.moveTo(0, -26);
+                            ctx.lineTo(24, -8);
+                            ctx.lineTo(0, 26);
+                            ctx.lineTo(-24, -8);
+                            ctx.closePath();
+                            ctx.fill();
+                            ctx.stroke();
+
+                            // 宝石の光沢
+                            ctx.fillStyle = '#e0f2fe';
+                            ctx.beginPath();
+                            ctx.moveTo(0, -26);
+                            ctx.lineTo(10, -8);
+                            ctx.lineTo(0, 0);
+                            ctx.lineTo(-10, -8);
+                            ctx.closePath();
+                            ctx.fill();
+
+                        } else if (note.type === 'SKULL') {
+                            // 骸骨 (SKULL / DANGER)
+                            // 危険な赤紫のオーラ
+                            ctx.fillStyle = 'rgba(225, 29, 72, 0.4)';
+                            ctx.beginPath();
+                            ctx.arc(0, 0, 32, 0, Math.PI * 2);
+                            ctx.fill();
+
+                            ctx.fillStyle = '#f8fafc';
+                            ctx.beginPath();
+                            ctx.arc(0, -6, 20, 0, Math.PI * 2);
+                            ctx.fill();
+
+                            // 骸骨のあご
+                            ctx.fillRect(-12, 5, 24, 14);
+
+                            // 骸骨の目と鼻
+                            ctx.fillStyle = '#0f172a';
+                            ctx.beginPath();
+                            ctx.arc(-7, -8, 6, 0, Math.PI * 2);
+                            ctx.arc(7, -8, 6, 0, Math.PI * 2);
+                            ctx.fill();
+
+                            ctx.beginPath();
+                            ctx.moveTo(0, -1);
+                            ctx.lineTo(-3, 5);
+                            ctx.lineTo(3, 5);
+                            ctx.fill();
+                        }
+
+                        ctx.restore();
+                    }
+
+                    // スルーして通り過ぎてしまった判定
+                    if (progress >= 1.08 && !note.hit && !note.missed) {
+                        note.missed = true;
+                        if (note.type === 'SKULL') {
+                            // 骸骨をスルーできた！ ➔ 回避成功（SAFE!）
+                            showJudgement('骸骨 回避成功！', 'text-emerald-400');
+                        } else {
+                            // 金貨や宝石を取り逃した
+                            combo = 0;
+                            showJudgement('見逃した！', 'text-rose-400');
+                            updateUI();
+                        }
+                    }
+                }
+
+                if (progress > 1.3 || note.hit) {
+                    activeNotes.splice(i, 1);
+                }
+            }
+        }
+
+        function drawParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= 0.03;
+
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = Math.max(0, p.alpha);
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+
+                if (p.alpha <= 0) particles.splice(i, 1);
+            }
+        }
+
+        // -------------------------------------------------------------
+        // RHYTHM SCHEDULER & GAME LOOP
+        // -------------------------------------------------------------
+        function updateRhythm() {
+            if (gameState !== 'PLAYING') return;
+
+            const currentTime = audio.ctx.currentTime;
+            const elapsedTime = currentTime - gameStartTime;
+            timeRemaining = GAME_DURATION - elapsedTime;
+
+            // タイムアップ判定
+            if (timeRemaining <= 0) {
+                endGame();
+                return;
+            }
+
+            const beatIndex = Math.floor(elapsedTime / BEAT_INTERVAL);
+
+            if (beatIndex > currentBeat) {
+                currentBeat = beatIndex;
+
+                const stepInPattern = currentBeat % 4;
+                const patternIdx = Math.floor(currentBeat / 4) % notePatterns.length;
+                const pattern = notePatterns[patternIdx];
+
+                // ドラムの基本拍
+                audio.playBeat(stepInPattern === 0);
+
+                // ノーツの生成タイミング判定
+                if (pattern.beats.includes(stepInPattern)) {
+                    // 到達予定時刻は2.5拍後
+                    const targetTime = gameStartTime + (currentBeat + 2.5) * BEAT_INTERVAL;
+                    spawnNote(pattern.type, targetTime);
+                }
+            }
+
+            updateUI();
+        }
+
+        function gameLoop(time) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            drawBackground(time);
+            drawTargetZone();
+            drawNotes();
+            drawParticles();
+
+            if (gameState === 'PLAYING') {
+                updateRhythm();
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // -------------------------------------------------------------
+        // GAME LIFECYCLE (START / END)
+        // -------------------------------------------------------------
+        function startGame() {
+            audio.init();
+            score = 0;
+            combo = 0;
+            maxCombo = 0;
+            perfectCount = 0;
+            skullHitCount = 0;
+            currentBeat = -1;
+            timeRemaining = GAME_DURATION;
+            activeNotes = [];
+            particles = [];
+
+            updateUI();
+
+            startOverlay.classList.add('hidden');
+            resultOverlay.classList.add('hidden');
+
+            gameState = 'PLAYING';
+            gameStartTime = audio.ctx.currentTime + 0.5;
+        }
+
+        function endGame() {
+            gameState = 'RESULT';
+
+            // ハイスコア更新チェック
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('pirate_catch_highscore', highScore.toString());
+            }
+
+            document.getElementById('final-score').innerText = `G ${score.toLocaleString()}`;
+            document.getElementById('final-perfect').innerText = perfectCount;
+            document.getElementById('final-maxcombo').innerText = maxCombo;
+            document.getElementById('final-skulls').innerText = skullHitCount;
+
+            const rankEl = document.getElementById('result-rank');
+            const commentEl = document.getElementById('result-comment');
+
+            if (score >= 12000) {
+                rankEl.innerText = '🏴‍☠️ 伝説の海賊王！';
+                rankEl.className = 'text-4xl sm:text-6xl font-black text-amber-300 mb-3 glow-gold';
+                commentEl.innerText = '凄まじい強欲さと反射神経！洞窟のお宝を全て持ち去った伝説の海賊だ！';
+            } else if (score >= 6000) {
+                rankEl.innerText = '⚔️ 大海賊級！';
+                rankEl.className = 'text-4xl sm:text-6xl font-black text-amber-400 mb-3';
+                commentEl.innerText = 'ナイスキャッチ！骸骨も上手くかわしてたっぷり金貨を手に入れたぞ！';
+            } else {
+                rankEl.innerText = '⚓ 見習い水夫';
+                rankEl.className = 'text-4xl sm:text-6xl font-black text-slate-300 mb-3';
+                commentEl.innerText = '骸骨（ドクロ）を押さずに回避するのがコツだ！次こそガッポリ掴み取ろう！';
+            }
+
+            resultOverlay.classList.remove('hidden');
+            startHighscore.innerText = `G ${highScore.toLocaleString()}`;
+        }
+
+        // -------------------------------------------------------------
+        // EVENT BINDINGS
+        // -------------------------------------------------------------
+        startBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', startGame);
+
+        // タップ/クリック操作
+        catchBtn.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            handlePlayerInput();
+        });
+
+        // キーボード操作（SPACE / ENTER / Z キー対応）
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyZ') {
+                e.preventDefault();
+                handlePlayerInput();
+            }
+        });
+
+        // ゲームループ起動
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
