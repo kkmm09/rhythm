@@ -206,10 +206,10 @@ let audioCtx;
 let bgmAudio = new Audio();
 let isBgmLoaded = false;
 
-// 【解説】GitHub/Render等に配置した「文化祭ゲームBGM.mp3」を直接読み込む関数
+// 【解説】GitHub/Render等に配置した「bgm.mp3」を直接読み込む関数
 function loadBGM() {
-    const bgmFileName = '文化祭ゲームBGM.mp3';
-    console.log(`[Audio Log] ローカル音源「${bgmFileName}」の読み込み処理を開始します...`);
+    const bgmFileName = 'bgm.mp3';
+    console.log(`[Audio Log] 音源「${bgmFileName}」の読み込み処理を開始します...`);
     
     // index.html と同じフォルダに置いたファイルパスを指定
     bgmAudio.src = bgmFileName;
@@ -232,7 +232,7 @@ function loadBGM() {
     // 音源ファイルの読み込みエラーイベント
     bgmAudio.addEventListener('error', (e) => {
         console.error(`[Audio Error] 音源ファイル「${bgmFileName}」の読み込みに失敗しました。index.htmlと同じ階層に同名ファイルがアップロードされているか確認してください。`, e);
-        document.getElementById('loading-text').innerText = "音源の読み込みに失敗しました（「文化祭ゲームBGM.mp3」の配置を確認してください）";
+        document.getElementById('loading-text').innerText = "音源の読み込みに失敗しました（「bgm.mp3」の配置を確認してください）";
         document.getElementById('btn-tutorial').disabled = false;
         document.getElementById('btn-start').disabled = false;
     });
